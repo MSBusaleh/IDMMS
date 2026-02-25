@@ -1,7 +1,7 @@
 import streamlit as st
 
 def app():
-  st.page_link("pages/2decision.py", label="Back to Decision", icon="⬅️")
+  st.page_link("pages/2_Decision.py", label="Back to Decision", icon="⬅️")
   st.title("IDMMS Dashboard")
   st.header("Report")
   st.write("Here is the report based on the current mud properties and the AI's recommendations.")
