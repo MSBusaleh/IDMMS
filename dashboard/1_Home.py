@@ -8,24 +8,15 @@ import serial
 from pyparsing import line
 URL = 'socket://localhost:4000'
 
-# Connect to port to receive data
-if 'ser' not in st.session_state:
-    st.session_state.ser = None
-    
-try:
-  st.session_state.ser = serial.serial_for_url(URL, timeout=1)
-    
-except Exception as e:
-  print(f"Connection failed: {e}")
 
 st.set_page_config(layout="wide")
-if 'proceeding' not in st.session_state:
+if 'proceeding' not in st.session_state: #The user didn't click "Proceed Now" yet, so we can show the data and decision button
     st.session_state.proceeding = False
 
-@st.fragment(run_every=4.0) # Automatically reruns this function every 4 second
+@st.fragment(run_every=4.0) # Automatically reruns this function every 1 second
 def app():
   if st.session_state.proceeding:
-    progress_text = "Applying additives on mud..."
+    progress_text = "Starting the mixing process..."
     my_bar = st.progress(0, text=progress_text)
 
     for percent_complete in range(100):
@@ -38,16 +29,26 @@ def app():
     time.sleep(4)
     st.session_state.proceeding = False
   
-  if st.session_state.ser is None:
-    try:
-      st.session_state.ser = serial.serial_for_url(URL, timeout=1)
-    
-    except Exception as e:
-      print(f"Connection failed: {e}")
-    
-
   st.title("IDMMS Dashboard")
   st.header("Current Mud Properties")
+  status = st.empty()
+  
+  while True:
+    try:
+      with open("../data.json", "r") as f:
+        data = json.load(f)
+        
+      seconds_since_update = time.time() - data["received_at"]
+      
+      with status.container():
+        if seconds_since_update > 8:
+          st.info(f'Data is {seconds_since_update:.1f} seconds old.')
+          time.sleep(1)
+          continue
+    
+    except Exception:
+      st.warning("Waiting for data from the Virtual Arduino...")
+
   data = get_data()
   figures = get_figures(data)
   data_area = st.empty()
@@ -86,9 +87,9 @@ def get_figures(data):
       value = data["density"],
       domain = {'x': [0, 1], 'y': [0, 1]},
       title = {'text': "Density (ppg)", 'font': {'size': 32}},
-      gauge = {'axis': {'range': [None, 20]},
+      gauge = {'axis': {'range': [None, 50]},
               'steps' : [{'range': [9, 10], 'color': "lightgreen"}],
-              'bar': {'color': "red" if data["density"] < 10 or data["density"] > 90 else "royalblue"},
+              'bar': {'color': "red" if data["density"] < 3 or data["density"] > 40 else "royalblue"},
               }))
 
   ph_indicator = go.Figure(go.Indicator(

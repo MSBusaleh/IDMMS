@@ -3,7 +3,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import time
 
-with open("settings.json", "r") as f:
+with open("..\settings.json", "r") as f:
     timer = json.load(f)
     
 st.set_page_config(layout="wide")
@@ -25,7 +25,7 @@ def app():
       with st.container(border=True):
         st.subheader(additive, text_alignment='center')
         max = get_storage(additive)
-        st.number_input("Amount (g)", value=amount, min_value=0.0, step=0.5, key=additive, max_value=max, help=f"Maximum available: {max} kg", width=200)
+        st.number_input("Amount (g)", value=amount, min_value=0.0, step=0.5, key=additive, max_value=max, help=f"Maximum available: {max} g", width=200)
 
   duration = timer["minutes"] * 60 + timer["seconds"]
   active_timer(duration)  #3 minutes default
@@ -44,10 +44,10 @@ def app():
   
   
 def get_additives():
-  return {"Bromine":35.0, "Hashtek Bashtek": 10.0}
+  return {"Bentonite":35.0, "Barite": 10.0}
 
 def get_storage(additive):
-  storage = {"Bromine": 100.0, "Hashtek Bashtek": 50.0}
+  storage = {"Bentonite": 100.0, "Barite": 50.0}
   return storage.get(additive, 0.0)
 
 
