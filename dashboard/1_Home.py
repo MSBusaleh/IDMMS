@@ -6,82 +6,96 @@ import pandas as pd
 import plotly.graph_objects as go
 import serial
 from pyparsing import line
-URL = 'socket://localhost:4000'
-
 
 st.set_page_config(layout="wide")
-if 'proceeding' not in st.session_state: #The user didn't click "Proceed Now" yet, so we can show the data and decision button
-    st.session_state.proceeding = False
+if 'mode' not in st.session_state:
+    st.session_state.mode = "monitoring" # Default state
+
 
 @st.fragment(run_every=4.0) # Automatically reruns this function every 1 second
 def app():
-  if st.session_state.proceeding:
-    progress_text = "Starting the mixing process..."
-    my_bar = st.progress(0, text=progress_text)
-
-    for percent_complete in range(100):
-        time.sleep(0.1)
-        my_bar.progress(percent_complete + 1, text=progress_text)
-    time.sleep(1)
-    my_bar.empty()
+  if st.session_state.mode == "monitoring":
+    render_monitoring()
+  elif st.session_state.mode == "loading":
+    render_loading()
     
-    st.success("Additives applied successfully! Returning to Home page...")
-    time.sleep(4)
-    st.session_state.proceeding = False
-  
+def render_monitoring():
   st.title("IDMMS Dashboard")
   st.header("Current Mud Properties")
   status = st.empty()
+  data_area = st.columns(5)
   
-  while True:
-    try:
-      with open("../data.json", "r") as f:
-        data = json.load(f)
-        
-      seconds_since_update = time.time() - data["received_at"]
+  
+  try:
+    with open("../data.json", "r") as f:
+      data = json.load(f)
       
-      with status.container():
-        if seconds_since_update > 8:
-          st.info(f'Data is {seconds_since_update:.1f} seconds old.')
-          time.sleep(1)
-          continue
-    
-    except Exception:
-      st.warning("Waiting for data from the Virtual Arduino...")
-
-  data = get_data()
-  figures = get_figures(data)
-  data_area = st.empty()
-  if figures:
-    data_area = st.columns(len(figures))
+    figures = get_figures(data)
     for i in range(len(figures)):
-      with data_area[i]:
-        st.write(figures[i])
-    
-    columns = st.columns(3)
-    with columns[1]:
-      if st.button(str("\nSee Decision\n"), type="primary", width='stretch', help="See the AI's recommendation based on the current mud properties"):
-        st.session_state.update({"timer_active": True})
+      data_area[i].plotly_chart(figures[i], width="stretch")
+      
+    button_area = st.columns(3)
+    if button_area[1].button(
+      str("\nSee Decision\n"), 
+      type="primary", 
+      width='stretch', 
+      help="See the AI's recommendation based on the current mud properties"
+      ):
         st.switch_page("pages/2_Decision.py")
-  else:
-    data_area.info("Waiting for data from the Virtual Arduino...")
+    
+    seconds_since_update = time.time() - data["received_at"]
+    
+    with status.container():
+      if seconds_since_update > 8:
+        st.warning(f'Data is {seconds_since_update:.0f} seconds old.')
+        
+    time.sleep(0.1)
+          
   
-def get_data():
-    try:
-      line = st.session_state.ser.readline().decode('utf-8').strip() 
-      if line:
-        data = json.loads(line)
-        return data
-    except Exception as e:
-      print(f"Error reading from serial: {e}")
-      st.info("Connecting to Virtual Arduino...")
-            
+  except Exception as e:
+    print(f"Error occurred: {e}")
+    with status.container():
+      st.info("Waiting for data...")
+  
+def render_loading():
+  st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
+
+  # Hide the sidebar entirely on this page so the user can't navigate away
+  st.markdown("""
+      <style>
+          [data-testid="stSidebar"] {display: none;}
+      </style>
+  """, unsafe_allow_html=True)
+
+  st.title("Waiting for mud to be stabilized...")
+  progress_text = "Applying additives and stabilizing mud properties..."
+  my_bar = st.progress(0, text=progress_text)
+
+  # Simulate the mixing process
+  for percent_complete in range(100):
+      time.sleep(0.04) 
+      my_bar.progress(percent_complete + 1, text=progress_text)
+
+  st.success("Additives applied successfully! Syncing sensors...")
+  time.sleep(1.5)
+
+  # After finishing, send them back home
+  st.session_state.mode = "monitoring"
 
 def get_figures(data):
   if not data:
-    print("get_figures: No data received yet.")
-    return None
-
+    data = {"ph": 0, "density": 0, "hardness": 0, "pressure": 0, "rheology": 0}
+  
+  pressure_indicator = go.Figure(go.Indicator(
+      mode = "gauge+number",
+      value = data["pressure"],
+      domain = {'x': [0, 1], 'y': [0, 1]},
+      title = {'text': "Pressure (psi)", 'font': {'size': 32}},
+      gauge = {'axis': {'range': [50, 150]},
+              'steps' : [{'range': [20, 80], 'color': "lightgreen"}],
+              'bar': {'color': "red" if data["pressure"] < 10 or data["pressure"] > 120 else "royalblue"},
+              }))
+  
   density_indicator = go.Figure(go.Indicator(
       mode = "gauge+number",
       value = data["density"],
@@ -112,18 +126,23 @@ def get_figures(data):
               'bar': {'color': "red" if data["hardness"] >= 90 else "royalblue"},
               }))
 
-  rhelogy_indicator = go.Figure(go.Indicator(
+  rheology_indicator = go.Figure(go.Indicator(
       mode = "gauge+number",
-      value = data["rhelogy"],
+      value = data["rheology"],
       domain = {'x': [0, 1], 'y': [0, 1]},
-      title = {'text': "Rhelogy (cp)", 'font': {'size': 32}},
+      title = {'text': "rheology (cp)", 'font': {'size': 32}},
       gauge = {'axis': {'range': [None, 20]},
               'steps' : [{'range': [3, 7], 'color': "lightgreen"}],
-              'bar': {'color': "red" if data["rhelogy"] < 1 or data["rhelogy"] > 17 else "royalblue"},
+              'bar': {'color': "red" if data["rheology"] < 1 or data["rheology"] > 17 else "royalblue"},
               }))
+  return [ pressure_indicator, density_indicator, ph_indicator, hardness_indicator, rheology_indicator]
 
-  print("get_figures: Data received and figures created.")
-  return [density_indicator, ph_indicator, hardness_indicator, rhelogy_indicator]
+def update_figures(figures, data):
+  figures[0].data[0].value = data["pressure"]
+  figures[1].data[0].value = data["density"]
+  figures[2].data[0].value = data["ph"]
+  figures[3].data[0].value = data["hardness"]
+  figures[4].data[0].value = data["rheology"]
 
 
 if __name__ == "__main__":

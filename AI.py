@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_percentage_error, r2_score
+from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, r2_score, root_mean_squared_error
 
 # ==========================================
 # 1. DATA GENERATOR (Strict Error Control)
@@ -26,7 +26,7 @@ def generate_data(samples=5000):
     df['pH'] = 8.5 + 3.2 * np.log10(1 + df['Caustic_ppb'] * 8)
     df['Fluid_Loss_mL'] = 18 * np.exp(-0.35 * df['Starch_ppb']) + (0.04 * df['Temp_F'])
     
-    noise_level = 0.005 
+    noise_level = 0.03 
     for col in ['Density_ppg', 'YP_lb100ft2', 'pH', 'Fluid_Loss_mL']:
         df[col] += np.random.normal(0, df[col].mean() * noise_level, samples)
         
@@ -57,13 +57,15 @@ accuracy_pct = (1 - mape) * 100
 print(f"--- ERROR ANALYSIS ---")
 print(f"Mean Absolute Percentage Error (MAPE): ({mape*100:.2f}%)")
 print(f"Model Accuracy: {accuracy_pct:.2f}%")
-print(f"R2 Score: {r2_score(y_test, predictions):.4f}")
+# print(f"R2 Score: {r2_score(y_test, predictions):.4f}")
 
 # ==========================================
 # 4. CONTROLLER SIMULATION
 # ==========================================
-test_well = [120, 15, 10, 4, 0.8, 150]
-current_preds = model.predict([test_well])[0]
+features = ['Barite_ppb', 'Bentonite_ppb', 'KCl_ppb', 'Starch_ppb', 'Caustic_ppb', 'Temp_F']
+test_well_raw = [120, 15, 10, 4, 0.8, 150]
+test_well_df = pd.DataFrame([test_well_raw], columns=features)
+current_preds = model.predict(test_well_df)[0]
 
 print(f"\n--- PREDICTED MUD PROPERTIES ---")
 print(f"Density: {current_preds[0]:.2f} ppg")
